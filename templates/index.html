@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='ELEC.png') }}">
+  <title>Service Request Portal</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+
+  <!-- hCaptcha API -->
+  <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+
+  <style>
+    /* Dialog Overlay */
+    .dialog-overlay {
+      display: none; /* Hidden by default */
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    /* Dialog Box */
+    .dialog-box {
+      background-color: rgb(237, 252, 252);
+      padding: 20px;
+      border-radius: 8px;
+      width: 350px;
+      height: 250px;
+      text-align: center;
+      position: relative;
+      box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+    }
+    /* Close Button */
+    .close-btn {
+      position: absolute;
+      top: 5px;
+      right: 10px;
+      font-size: 20px;
+      cursor: pointer;
+      transition: color 0.3s ease;
+    }
+    .close-btn:hover {
+      color: red;
+    }
+    /* Loading Overlay */
+    #loading {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.8);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #333;
+    }
+    /* Centered Input with Arrow Inside */
+    .input-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 1000px; /* Ensures it stays responsive */
+      display: flex;
+      align-items: center;
+      margin: 20px auto;
+    }
+    input#serial_no {
+      width: 100%;
+      height: 40px;
+      font-size: 16px;
+      padding-right: 40px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+      padding-left: 10px;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    input#serial_no:focus {
+      outline: none;
+      border-color: #66afe9;
+      box-shadow: 0 0 5px rgba(102, 175, 233, 0.6);
+    }
+    button#enterButton {
+      position: absolute;
+      right: 10px; /* 2px space from the right */
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      color: #333; /* Dark color when enabled */
+      padding: 5px;
+      transition: color 0.3s ease;
+    }
+    /* New CSS rule: when the button is disabled, use a lighter color and a not-allowed cursor */
+    button#enterButton:disabled {
+      color: #ccc;
+      cursor: not-allowed;
+    }
+    button#enterButton:hover {
+      color: black;
+    }
+    /* Responsive: Adjust input width on smaller screens */
+    @media (max-width: 600px) {
+      .input-wrapper {
+        max-width: 300px;
+      }
+    }
+    /* Captcha Container for Responsive Alignment */
+    .captcha-container {
+      display: flex;
+      justify-content: center;
+      margin: 20px auto;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="https://www.electrolabgroup.com/">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 60px;">
+  </a>
+</header>
+
+<main style="max-width: 800px; margin: 40px auto; text-align: center;">
+  <h1>Enter Serial Number</h1>
+  <div class="input-wrapper">
+    <input type="text" id="serial_no" placeholder="Enter Serial Number" required autocomplete="off" autofocus>
+    <!-- Button is now disabled by default -->
+    <button id="enterButton" disabled><i class="fa-solid fa-arrow-right"></i></button>
+  </div>
+
+  <!-- hCaptcha Widget with data-callback to enable the button when solved -->
+  <div class="captcha-container">
+    <div class="h-captcha" data-sitekey="403a17b2-3a9a-4834-9fec-254080701fb8" data-callback="enableSearchButton"></div>
+  </div>
+
+  <!-- Error Dialog Box -->
+  <div id="errorDialog" class="dialog-overlay">
+    <div class="dialog-box">
+      <span id="closeDialog" class="close-btn">&times;</span>
+      <p id="errorMessage">Error message here</p>
+    </div>
+  </div>
+</main>
+
+<!-- Loading Overlay -->
+<div id="loading">
+  Loading...
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const inputField = document.getElementById("serial_no");
+    const enterButton = document.getElementById("enterButton");
+    const errorDialog = document.getElementById("errorDialog");
+    const errorMessage = document.getElementById("errorMessage");
+    const closeDialog = document.getElementById("closeDialog");
+
+    // hCaptcha callback: enable the search button when the captcha is completed.
+    window.enableSearchButton = function(token) {
+      enterButton.disabled = false;
+    };
+
+    enterButton.addEventListener("click", function () {
+      fetchSerialDetails();
+    });
+
+    inputField.addEventListener("keypress", function (event) {
+      if (event.key === "Enter") {
+        fetchSerialDetails();
+      }
+    });
+
+    closeDialog.addEventListener("click", function () {
+      errorDialog.style.display = "none"; // Close dialog on click
+    });
+
+    function fetchSerialDetails() {
+      const serialNo = inputField.value.trim();
+      if (!serialNo) {
+        showErrorDialog("Please enter a serial number.");
+        return;
+      }
+
+      // Check if hCaptcha is completed
+      var captchaResponse = hcaptcha.getResponse();
+      if (captchaResponse.length === 0) {
+        showErrorDialog("Please complete the captcha.");
+        return;
+      }
+
+      document.getElementById("loading").style.display = "flex"; // Show loading
+
+      fetch(`/get_serial_details?serial_no=${serialNo}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Serial number not found, for service request you can reach us at service@electrolabgroup.com or +91 9167839674");
+          }
+          return response.json();
+        })
+        .then(data => {
+          // Process the serial details and redirect based on maintenance status
+          if (data.maintenance_status === "Under Warranty") {
+            window.location.href = `/warranty?serial_no=${encodeURIComponent(serialNo)}`;
+          } else {
+            window.location.href = `/issue?serial_no=${encodeURIComponent(serialNo)}`;
+          }
+        })
+        .catch(error => {
+          console.error("Error fetching serial details:", error);
+          document.getElementById("loading").style.display = "none";
+          showErrorDialog("We were not able to fetch this serial number in our system.\nFor service booking please mail us on: service@electrolabgroup.com");
+        });
+    }
+
+    function showErrorDialog(message) {
+      errorMessage.innerText = message;
+      errorDialog.style.display = "flex";
+    }
+  });
+</script>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

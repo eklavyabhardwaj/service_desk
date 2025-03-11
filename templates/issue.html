@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='ELEC.png') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+
+  <title>Raise Serve Request</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    /* Loading Overlay Style */
+    #loading {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.8);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #333;
+    }
+    /* Modal Popup Styles for Flash Messages */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 10000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.4);
+    }
+    .modal-content {
+      background-color: #fefefe;
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    /* Modal Popup Styles for TNC */
+    #tncModal .modal-content {
+      max-width: 600px;
+      text-align: left;
+    }
+    #tncModal h1 {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+    #tncModal button {
+      display: block;
+      margin: 20px auto 0;
+      padding: 10px 20px;
+      border: none;
+      background-color: #337ab7;
+      color: #fff;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    /* TNC container: arrange text, link then checkbox inline */
+    .tnc-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      font-size: 14px;
+      color: #555;
+    }
+    .tnc-container span {
+      margin-right: 8px;
+    }
+    .tnc-container a.tnc-link {
+      margin-right: 8px;
+      text-decoration: underline;
+      color: #337ab7;
+    }
+    /* Adjust the checkbox vertically further */
+    .tnc-container input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      position: relative;
+      top: 8px;  /* Adjust this value as needed */
+      margin-left: 2px;
+    }
+    /* Minimal inline styles for the OTP container modification */
+    /* Replicate the input-wrapper style used in your index page */
+    #otpContainer {
+      position: relative;
+      display: none; /* hidden by default */
+      max-width: 100%;
+      margin-bottom: 15px;
+    }
+    #otpContainer input#otp {
+      width: 100%;
+      height: 40px;
+      font-size: 16px;
+      padding-right: 60px; /* space for the verify button */
+      padding-left: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    #otpContainer input#otp:focus {
+      outline: none;
+      border-color: #66afe9;
+      box-shadow: 0 0 5px rgba(102, 175, 233, 0.6);
+    }
+    #verifyOtpButton {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      font-size: 16px;
+      color: #333;
+      cursor: pointer;
+      width: 80px;       /* Fixed width for consistent alignment */
+      text-align: center;
+      line-height: 40px; /* Align with the input height */
+    }
+    #verifyOtpButton:hover {
+      color: #000;
+    }
+    #otpStatus {
+      margin-top: 8px;
+      font-weight: bold;
+      color: green;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+    <a href="https://www.electrolabgroup.com/">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 50px;">
+    </a>
+</header>
+
+<!-- Updated Back to Home link with gray text -->
+<div>
+  <a href="/" class="text-gray-600 hover:text-gray-800 mb-4 inline-block ml-10 mt-7">← Back to Search</a>
+</div>
+
+<!-- Hidden Flash Messages Container -->
+<div class="flash-messages" style="display:none;">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul>
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+</div>
+
+<!-- Modal Popup for Flash Messages -->
+<div id="popupModal" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <p id="popupMessage"></p>
+  </div>
+</div>
+
+<!-- TNC Modal -->
+<div id="tncModal" class="modal">
+  <div class="modal-content">
+    <span id="closeTNC" class="close">&times;</span>
+    <h1>Terms and Conditions</h1>
+    <div id="tncContent" style="max-height:300px; overflow-y:auto;">
+      <!-- Paste your TNC content here -->
+      <p><strong>1. Eligibility for Service Ticket Submission:</strong></p>
+      <ul>
+        <li>Service tickets can only be raised by authorized personnel or registered customers.</li>
+        <li>The machine must be under a valid warranty or covered under an active service contract.</li>
+        <li>For out-of-warranty machines, service charges will apply as per company policy.</li>
+        <li>The company reserves the right to refuse service for unauthorized or tampered machines.</li>
+      </ul>
+      <p><strong>2. Information Required for Service Request:</strong></p>
+      <ul>
+        <li>The user must provide the machine's serial number, model, and purchase details.</li>
+        <li>A clear and detailed description of the issue, including relevant error codes or images, must be submitted.</li>
+        <li>Accurate contact details of the requester must be provided for effective communication.</li>
+      </ul>
+      <!-- Continue with additional TNC content as needed -->
+    </div>
+    <button id="agreeTNC">I Agree</button>
+  </div>
+</div>
+
+<form action="{{ url_for('submit_form') }}" method="POST" enctype="multipart/form-data">
+  <h2 class="formbold-form-title">Raise Service Request</h2>
+
+  <!-- Hidden Fields -->
+  <input type="hidden" name="naming_series" value="2425ISS.#####">
+  <input type="hidden" name="status" value="Open">
+  <input type="hidden" name="priority" value="High">
+  <!-- Add multi-select for Issue Type -->
+  <div class="formbold-input-flex">
+    <div>
+      <label for="issue_type">Issue Type *</label>
+      <select name="issue_type" id="issue_type" required>
+        <option value="" disabled selected> Choose issue type</option>
+        <option value="Temperature">Temperature</option>
+        <option value="RPM">RPM</option>
+        <option value="Vacuum">Vacuum</option>
+        <option value="Sample">Sample</option>
+        <option value="Display">Display</option>
+        <option value="Leakage">Leakage</option>
+        <option value="Keypad">Keypad</option>
+        <option value="Other">Others</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Other Visible Fields -->
+  <div class="formbold-input-flex">
+    <div>
+      <label>Serial Number *</label>
+      <input type="text" name="serial_no" id="serial_no">
+    </div>
+    <input type="hidden" name="item_name" id="item_name" readonly>
+  </div>
+
+  <div class="formbold-input-flex">
+    <div>
+      <label>Zonal Manager</label>
+      <input type="text" name="zonal_manager" id="zonal_manager" readonly>
+    </div>
+  </div>
+
+  <div class="formbold-input-flex">
+    <div>
+      <label>Customer User Email ID *</label>
+      <input type="email" name="custom_contact_email" id="custom_contact_email" required>
+    </div>
+  </div>
+
+  <!-- New OTP Container: Verify button inside the OTP textbox -->
+  <div id="otpContainer" class="input-wrapper">
+    <input type="text" name="otp" id="otp" placeholder="Enter OTP">
+    <button type="button" id="verifyOtpButton">Verify OTP</button>
+  </div>
+  <div id="otpStatus"></div>
+
+  <div class="formbold-input-flex">
+    <div>
+      <label>Contact Person Name *</label>
+      <input type="text" name="contact_person_name" required>
+    </div>
+    <div>
+      <label>Phone Number *</label>
+      <input type="text" name="phone_number" id="phone_number" required>
+    </div>
+  </div>
+
+  <div class="formbold-input-flex">
+    <div>
+      <label>Machine Plan Status</label>
+      <input type="text" name="amc_type" id="amc_type" readonly>
+    </div>
+    <div>
+      <label>Customer</label>
+      <input type="text" name="customer" id="customer" readonly>
+    </div>
+  </div>
+
+  <!-- Hidden additional fields -->
+  <input type="hidden" name="territory" id="territory">
+  <input type="hidden" name="serial_no[]" id="table_serial_no">
+  <input type="hidden" name="item_code[]" id="item_code">
+  <input type="hidden" name="customer_instrument_id[]" id="customer_instrument_id">
+  <input type="hidden" name="issue_generate_date" id="issue_generate_date">
+  <input type="hidden" name="issue_received_date[]" id="issue_received_date">
+
+  <div>
+    <label for="description">Description *</label>
+    <textarea name="description" id="description" placeholder="Describe the issue..."></textarea>
+  </div>
+
+  <!-- TNC acceptance arranged inline: text, link then checkbox -->
+  <div class="tnc-container">
+    <span>I agree to the terms and conditions</span>
+    <a href="#" id="openTNC" class="tnc-link">Read here</a>
+    <input type="checkbox" id="enableSubmit" onclick="toggleButton()">
+  </div>
+
+  <button id="submitButton" class="formbold-btn" disabled>Submit Issue</button>
+</form>
+
+<!-- Loading Overlay -->
+<div id="loading">
+  Loading...
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script>
+  // Modal popup code for flash messages (existing functionality)
+  document.addEventListener("DOMContentLoaded", function() {
+    var modal = document.getElementById("popupModal");
+    var closeBtn = document.getElementsByClassName("close")[0];
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        var message = "{{ messages[0][1]|safe }}";
+        document.getElementById("popupMessage").innerText = message;
+        modal.style.display = "block";
+      {% endif %}
+    {% endwith %}
+
+    // When the user clicks the close button, hide modal and redirect
+    closeBtn.onclick = function() {
+      modal.style.display = "none";
+      window.location.href = "https://www.electrolabgroup.com";
+    }
+    // When the user clicks outside the modal content, hide modal and redirect
+    window.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+        window.location.href = "https://www.electrolabgroup.com";
+      }
+    }
+  });
+
+  // Set current date for issue_generate_date and issue_received_date fields
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const formatted = yyyy + '-' + mm + '-' + dd;
+  document.getElementById('issue_generate_date').value = formatted;
+  document.getElementById('issue_received_date').value = formatted;
+
+  function toggleButton() {
+    const checkbox = document.getElementById('enableSubmit');
+    const submitButton = document.getElementById('submitButton');
+    if (checkbox.checked) {
+      submitButton.disabled = false;
+      submitButton.classList.add('enabled');
+    } else {
+      submitButton.disabled = true;
+      submitButton.classList.remove('enabled');
+    }
+  }
+
+  // TNC Modal functionality
+  document.addEventListener("DOMContentLoaded", function() {
+    var tncModal = document.getElementById("tncModal");
+    var openTNC = document.getElementById("openTNC");
+    var closeTNC = document.getElementById("closeTNC");
+    var agreeTNC = document.getElementById("agreeTNC");
+
+    openTNC.addEventListener("click", function(e) {
+      e.preventDefault();
+      tncModal.style.display = "block";
+    });
+
+    closeTNC.addEventListener("click", function() {
+      tncModal.style.display = "none";
+    });
+
+    agreeTNC.addEventListener("click", function() {
+      // Check the TNC checkbox and enable submit
+      var checkbox = document.getElementById("enableSubmit");
+      checkbox.checked = true;
+      toggleButton();
+      tncModal.style.display = "none";
+    });
+
+    // Optional: close the TNC modal when clicking outside its content
+    window.addEventListener("click", function(event) {
+      if (event.target == tncModal) {
+        tncModal.style.display = "none";
+      }
+    });
+  });
+
+  // OTP functionality: Send OTP automatically on email blur and verify/verify again OTP with the button
+  document.getElementById("custom_contact_email").addEventListener("blur", function() {
+    const email = this.value.trim();
+    if (email) {
+      const formData = new FormData();
+      formData.append("custom_contact_email", email);
+      fetch("/send_otp", {
+        method: "POST",
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          alert(data.error);
+        } else {
+          document.getElementById("otpContainer").style.display = "flex";
+          document.getElementById("otpStatus").innerText = "OTP sent. Please check your email.";
+        }
+      })
+      .catch(err => {
+        console.error("Error sending OTP:", err);
+        alert("Error sending OTP. Please try again later.");
+      });
+    }
+  });
+
+  document.getElementById("verifyOtpButton").addEventListener("click", function() {
+    const button = this;
+    const otp = document.getElementById("otp").value.trim();
+    const email = document.getElementById("custom_contact_email").value.trim();
+    if (otp && email) {
+      const formData = new FormData();
+      formData.append("custom_contact_email", email);
+      formData.append("otp", otp);
+      fetch("/verify_otp", {
+        method: "POST",
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          document.getElementById("otpStatus").innerText = "OTP verification failed.";
+          button.innerText = "Verify Again";
+        } else {
+          document.getElementById("otpStatus").innerHTML = '<i class="fa fa-check" style="color:green;"></i> OTP verified successfully.';
+          button.disabled = true;
+        }
+      })
+      .catch(err => {
+        console.error("Error verifying OTP:", err);
+        document.getElementById("otpStatus").innerText = "OTP verification failed.";
+        button.innerText = "Verify Again";
+      });
+    }
+  });
+</script>
+</body>
+</html>

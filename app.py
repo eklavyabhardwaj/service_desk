@@ -2,21 +2,26 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 import requests
 import pandas as pd
 import random
+import re
 from datetime import datetime
 from flask_cors import CORS
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-# Constants for OTP security
-OTP_EXPIRATION_SECONDS = 300   # 5 minutes
-OTP_RATE_LIMIT_SECONDS = 60      # 1 minute
+
+def is_valid_email(email):
+    # A simple regex for validating an email address
+    regex = r"^[^@]+@[^@]+\.[^@]+$"
+    return re.match(regex, email) is not None
+
 
 # Generate a random secret key for session management
 random_number = random.randint(14364546454654654654651465654, 9168468484867187618761871687171)
 app = Flask(__name__)
 app.secret_key = str(random_number)
 CORS(app)
+
 
 def load_and_preprocess_data():
     base_url = 'https://erpv14.electrolabgroup.com/'
@@ -126,46 +131,9 @@ def load_and_preprocess_data():
     result_df.rename(columns={'name': 'customer'}, inplace=True)
     return result_df.set_index('customer')['zonal_manager'].to_dict()
 
+
 customer_zonal_manager_map = load_and_preprocess_data()
 
-# -----------------------------
-# OTP functionality with additional security
-# -----------------------------
-@app.route('/send_otp', methods=['POST'])
-def send_otp():
-    email = request.form.get('custom_contact_email')
-    if not email:
-        return jsonify({'error': 'Email is required to send OTP'}), 400
-
-    now = datetime.now().timestamp()
-    # Rate limit: Only allow sending OTP once per OTP_RATE_LIMIT_SECONDS
-    if session.get('otp_last_sent'):
-        last_sent = float(session.get('otp_last_sent'))
-        if now - last_sent < OTP_RATE_LIMIT_SECONDS:
-            return jsonify({'error': 'Please wait before requesting a new OTP'}), 429
-
-    # Generate a 6-digit OTP
-    otp = random.randint(100000, 999999)
-    session['otp'] = str(otp)
-    session['otp_email'] = email
-    session['otp_timestamp'] = str(now)
-    session['otp_last_sent'] = str(now)
-
-    # Prepare the email message using SMTP_SSL configuration
-    msg = MIMEMultipart()
-    msg['From'] = SMTP_EMAIL
-    msg['To'] = email
-    msg['Subject'] = "Your OTP for Email Verification"
-    msg.attach(MIMEText(f"Your OTP is: {otp}. It will expire in 5 minutes.", 'plain'))
-
-    try:
-        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_EMAIL, email, msg.as_string())
-        return jsonify({'message': 'OTP sent successfully'})
-    except Exception as e:
-        print("OTP send error:", e)
-        return jsonify({'error': 'Failed to send OTP'}), 500
 
 # -----------------------------
 # Existing routes
@@ -181,6 +149,7 @@ def get_zonal_manager():
             return jsonify({'zonal_manager': 'Not Found'})
     else:
         return jsonify({'error': 'Customer not provided or data not loaded'}), 400
+
 
 @app.route('/get_issue_table', methods=['GET'])
 def get_issue_table():
@@ -214,6 +183,7 @@ def get_issue_table():
         return jsonify(result_data)
     else:
         return jsonify({"error": "Failed to fetch data from API"}), 500
+
 
 @app.route('/get_serial_details', methods=['GET'])
 def get_serial_details():
@@ -298,12 +268,14 @@ def get_serial_details():
 
     return jsonify(result)
 
+
 # Global SMTP_SSL configuration using your provided settings
 SMTP_SERVER = "email.electrolabgroup.com"
 SMTP_PORT = 465
 SMTP_USERNAME = "econnect"
 SMTP_PASSWORD = "Requ!reMent$"
 SMTP_EMAIL = "econnect@electrolabgroup.com"  # Sender email
+
 
 @app.route('/submit', methods=['POST'])
 def submit_form():
@@ -312,21 +284,14 @@ def submit_form():
     url = base_url + endpoint
     headers = {
         'Authorization': 'token 3ee8d03949516d0:6baa361266cf807',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Expect': ''  # Disable the default Expect header
     }
     try:
-        # OTP verification: Check if OTP is provided and valid
-        entered_otp = request.form.get('otp')
-        if not entered_otp:
-            flash("OTP is required. Please verify your email.", "error")
-            return redirect(url_for('issue'))
-        if session.get('otp') != entered_otp:
-            flash("Invalid OTP. Please try again.", "error")
-            return redirect(url_for('issue'))
-        # Check OTP expiration
-        otp_timestamp = float(session.get('otp_timestamp', 0))
-        if datetime.now().timestamp() - otp_timestamp > OTP_EXPIRATION_SECONDS:
-            flash("OTP has expired. Please request a new one.", "error")
+        # Check email validity before processing form data
+        email = request.form.get('custom_contact_email', '').strip()
+        if not email or not is_valid_email(email):
+            flash("Invalid email address. Please enter a valid email.", "error")
             return redirect(url_for('issue'))
 
         form_data = {
@@ -337,20 +302,22 @@ def submit_form():
             "issue_type": ", ".join(request.form.getlist('issue_type')) if request.form.getlist('issue_type') else "NA",
             "serial_no": request.form.get('serial_no'),
             "customer": request.form.get('customer'),
-            "custom_contact_email": request.form.get('custom_contact_email'),
+            "custom_contact_email": email,
             "issue_generate_date": request.form.get('issue_generate_date'),
             "zonal_manager": request.form.get('zonal_manager'),
             "territory": request.form.get('territory'),
             "job_type": request.form.get('job_type') or "ONLINE SUPPORT",
             "issue_responsibility_with": request.form.get('issue_responsibility_with'),
             "prio_po_number": request.form.get('prio_po_number') or "NA",
-            "amc_type": request.form.get('amc_type'),
+            "amc_type": request.form.get('amc_type') or "Out Of Warranty",
             "description": (
                 f"{request.form.get('description', '').strip()}"
                 f"<br><br><b>{request.form.get('contact_person_name', '').strip()} "
+                f"{request.form.get('phone_extension', '').strip()}"
                 f"{request.form.get('phone_number', '').strip()}</b>"
             )
         }
+
         if not form_data['issue_generate_date']:
             form_data['issue_generate_date'] = datetime.today().strftime('%Y-%m-%d')
         received_dates = request.form.getlist('issue_received_date[]')
@@ -373,39 +340,41 @@ def submit_form():
 
         print("Issue Form Data:", form_data)
         response = requests.post(url, json=form_data, headers=headers)
+        print("ERP Response:", response.text)
+
         if response.ok:
             try:
                 issue_response = response.json()
                 issue_name = issue_response.get("data", {}).get("name", "Unknown")
 
-                # Prepare email variables
-                RECIPIENT_EMAILS = [form_data.get("custom_contact_email", "default@example.com")]
+                RECIPIENT_EMAILS = [email]
                 message = f'Your File is submitted with ID : {issue_name}'
 
-                # Create the email message using MIME
                 msg = MIMEMultipart()
                 msg['From'] = SMTP_EMAIL
                 msg['To'] = ", ".join(RECIPIENT_EMAILS)
                 msg['Subject'] = "Electrolab Issue Form Notification"
                 msg.attach(MIMEText(message, 'plain'))
 
-                # Send the email using SMTP_SSL
                 try:
                     with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
                         server.login(SMTP_USERNAME, SMTP_PASSWORD)
                         server.sendmail(SMTP_EMAIL, RECIPIENT_EMAILS, msg.as_string())
                         print("Email sent successfully.")
                 except Exception as e:
-                    print("An error occurred:", e)
+                    print("An error occurred while sending email:", e)
             except Exception as e:
                 issue_name = "Unknown"
-            flash(f'Request submitted successfully! Issue Name: {issue_name}, for any query contact us on: service@electrolabgroup.com or +91 9167839674', 'success')
+            flash(
+                f'Request submitted successfully! Issue Name: {issue_name}, for any query contact us on: service@electrolabgroup.com or +91 9167839674',
+                'success')
         else:
             flash(f'Error {response.status_code}, please check the form and submit again.', 'error')
     except Exception as e:
         print("Exception details:", str(e))
         flash(f'Error occurred: {str(e)}', 'error')
     return redirect(url_for('issue'))
+
 
 @app.route('/submit2', methods=['POST'])
 def submit_form_warranty():
@@ -417,23 +386,16 @@ def submit_form_warranty():
         'Content-Type': 'application/json'
     }
     try:
-        # OTP verification for warranty form
-        entered_otp = request.form.get('otp')
-        if not entered_otp:
-            flash("OTP is required. Please verify your email.", "error")
-            return redirect(url_for('warranty'))
-        if session.get('otp') != entered_otp:
-            flash("Invalid OTP. Please try again.", "error")
-            return redirect(url_for('warranty'))
-        otp_timestamp = float(session.get('otp_timestamp', 0))
-        if datetime.now().timestamp() - otp_timestamp > OTP_EXPIRATION_SECONDS:
-            flash("OTP has expired. Please request a new one.", "error")
+        # Check email validity before processing warranty form data
+        email = request.form.get('custom_contact_email', '').strip()
+        if not email or not is_valid_email(email):
+            flash("Invalid email address. Please enter a valid email.", "error")
             return redirect(url_for('warranty'))
 
         form_data = {
             "naming_series": request.form.get('naming_series'),
             "status": request.form.get('status'),
-            "custom_contact_email": request.form.get('custom_contact_email'),
+            "custom_contact_email": email,
             "priority": request.form.get('priority'),
             "customer": request.form.get('customer'),
             "serial_no": request.form.get('serial_no'),
@@ -451,7 +413,7 @@ def submit_form_warranty():
             "customer_name": request.form.get('customer_name'),
             "customer_address": request.form.get('customer_address'),
             "complaint_raised_by": (
-                request.form.get('contact_person_name', '') + " " + request.form.get('phone_number', '')
+                    request.form.get('contact_person_name', '') + " " + request.form.get('phone_number', '')
             )
         }
         if not form_data['complaint_date']:
@@ -466,18 +428,15 @@ def submit_form_warranty():
                 warranty_response = response.json()
                 warranty_name = warranty_response.get("data", {}).get("name", "Unknown")
 
-                # Prepare email variables
-                RECIPIENT_EMAILS = [form_data.get("custom_contact_email", "default@example.com")]
+                RECIPIENT_EMAILS = [email]
                 message = f'Your File is submitted with ID : {warranty_name}'
 
-                # Create the email message using MIME
                 msg = MIMEMultipart()
                 msg['From'] = SMTP_EMAIL
                 msg['To'] = ", ".join(RECIPIENT_EMAILS)
                 msg['Subject'] = "Electrolab Warranty Form Notification"
                 msg.attach(MIMEText(message, 'plain'))
 
-                # Send the email using SMTP_SSL
                 try:
                     with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
                         server.login(SMTP_USERNAME, SMTP_PASSWORD)
@@ -487,7 +446,9 @@ def submit_form_warranty():
                     print("An error occurred:", e)
             except Exception as e:
                 warranty_name = "Unknown"
-            flash(f'Request submitted successfully! Warranty Name: {warranty_name}, for any query contact us on: service@electrolabgroup.com or +91 9167839674', 'success')
+            flash(
+                f'Request submitted successfully! Warranty Name: {warranty_name}, for any query contact us on: service@electrolabgroup.com or +91 9167839674',
+                'success')
         else:
             flash(f'Error {response.status_code}, please check the form and submit again.', 'error')
     except Exception as e:
@@ -495,21 +456,26 @@ def submit_form_warranty():
         flash(f'Error occurred: {str(e)}', 'error')
     return redirect(url_for('warranty'))
 
+
 @app.route('/')
 def home():
     return render_template('index.html')
+
 
 @app.route('/issue')
 def issue():
     return render_template('issue.html')
 
+
 @app.route('/warranty')
 def warranty():
     return render_template('warranty.html')
 
+
 @app.route('/terms')
 def tnc():
     return render_template('tnc.html')
+
 
 @app.route('/search_serials', methods=['GET'])
 def search_serials():
@@ -538,30 +504,6 @@ def search_serials():
     else:
         print(f"Error fetching data from ERP. Status: {response.status_code}, Response: {response.text}")
         return jsonify([])
-
-
-
-@app.route('/verify_otp', methods=['POST'])
-def verify_otp():
-    email = request.form.get('custom_contact_email')
-    entered_otp = request.form.get('otp')
-    if not email or not entered_otp:
-        return jsonify({'error': 'Email and OTP are required'}), 400
-    # Ensure the OTP was sent for this email
-    if session.get('otp_email') != email:
-        return jsonify({'error': 'Email does not match OTP request'}), 400
-    if session.get('otp') != entered_otp:
-        return jsonify({'error': 'Invalid OTP'}), 400
-    # Check OTP expiration (assuming OTP_EXPIRATION_SECONDS is defined)
-    otp_timestamp = float(session.get('otp_timestamp', 0))
-    if datetime.now().timestamp() - otp_timestamp > OTP_EXPIRATION_SECONDS:
-        return jsonify({'error': 'OTP has expired'}), 400
-    # If OTP is verified, clear it from session (optional)
-    session.pop('otp', None)
-    session.pop('otp_timestamp', None)
-    return jsonify({'message': 'OTP verified successfully'})
-
-
 
 
 if __name__ == '__main__':

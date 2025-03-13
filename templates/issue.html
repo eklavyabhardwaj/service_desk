@@ -4,10 +4,18 @@
   <meta charset="UTF-8">
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='ELEC.png') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-
   <title>Raise Serve Request</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <style>
+    /* Basic flex container for form fields */
+    .formbold-input-flex {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 15px;
+    }
+    .formbold-input-flex > div {
+      flex: 1;
+    }
     /* Loading Overlay Style */
     #loading {
       display: none;
@@ -87,19 +95,17 @@
       text-decoration: underline;
       color: #337ab7;
     }
-    /* Adjust the checkbox vertically further */
     .tnc-container input[type="checkbox"] {
       width: 16px;
       height: 16px;
       position: relative;
-      top: 8px;  /* Adjust this value as needed */
+      top: 8px;
       margin-left: 2px;
     }
-    /* Minimal inline styles for the OTP container modification */
-    /* Replicate the input-wrapper style used in your index page */
+    /* OTP Container Styles */
     #otpContainer {
       position: relative;
-      display: none; /* hidden by default */
+      display: none;
       max-width: 100%;
       margin-bottom: 15px;
     }
@@ -107,7 +113,7 @@
       width: 100%;
       height: 40px;
       font-size: 16px;
-      padding-right: 60px; /* space for the verify button */
+      padding-right: 60px;
       padding-left: 10px;
       border: 1px solid #ccc;
       border-radius: 4px;
@@ -129,9 +135,9 @@
       font-size: 16px;
       color: #333;
       cursor: pointer;
-      width: 80px;       /* Fixed width for consistent alignment */
+      width: 80px;
       text-align: center;
-      line-height: 40px; /* Align with the input height */
+      line-height: 40px;
     }
     #verifyOtpButton:hover {
       color: #000;
@@ -141,17 +147,37 @@
       font-weight: bold;
       color: green;
     }
+    /* Phone extension group styling (matching other fields) */
+    .phone-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 30px;  /* Shifts the phone group a little down */
+    }
+    .phone-group select,
+    .phone-group input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+      font-size: 14px;
+      color: #333;
+    }
+    .phone-group select {
+      max-width: 120px;
+    }
   </style>
 </head>
 <body>
 
 <header>
-    <a href="https://www.electrolabgroup.com/">
-        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 50px;">
-    </a>
+  <a href="https://www.electrolabgroup.com/">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 50px;">
+  </a>
 </header>
 
-<!-- Updated Back to Home link with gray text -->
+<!-- Updated Back to Home link -->
 <div>
   <a href="/" class="text-gray-600 hover:text-gray-800 mb-4 inline-block ml-10 mt-7">← Back to Search</a>
 </div>
@@ -197,7 +223,6 @@
         <li>A clear and detailed description of the issue, including relevant error codes or images, must be submitted.</li>
         <li>Accurate contact details of the requester must be provided for effective communication.</li>
       </ul>
-      <!-- Continue with additional TNC content as needed -->
     </div>
     <button id="agreeTNC">I Agree</button>
   </div>
@@ -210,12 +235,12 @@
   <input type="hidden" name="naming_series" value="2425ISS.#####">
   <input type="hidden" name="status" value="Open">
   <input type="hidden" name="priority" value="High">
-  <!-- Add multi-select for Issue Type -->
+
   <div class="formbold-input-flex">
     <div>
       <label for="issue_type">Issue Type *</label>
       <select name="issue_type" id="issue_type" required>
-        <option value="" disabled selected> Choose issue type</option>
+        <option value="" disabled selected>Choose issue type</option>
         <option value="Temperature">Temperature</option>
         <option value="RPM">RPM</option>
         <option value="Vacuum">Vacuum</option>
@@ -228,7 +253,6 @@
     </div>
   </div>
 
-  <!-- Other Visible Fields -->
   <div class="formbold-input-flex">
     <div>
       <label>Serial Number *</label>
@@ -251,36 +275,37 @@
     </div>
   </div>
 
-  <!-- New OTP Container: Verify button inside the OTP textbox -->
-  <div id="otpContainer" class="input-wrapper">
-    <input type="text" name="otp" id="otp" placeholder="Enter OTP">
-    <button type="button" id="verifyOtpButton">Verify OTP</button>
-  </div>
-  <div id="otpStatus"></div>
 
+
+  <!-- Contact Person, Phone Extension, and Phone Number -->
   <div class="formbold-input-flex">
     <div>
       <label>Contact Person Name *</label>
       <input type="text" name="contact_person_name" required>
     </div>
-    <div>
-      <label>Phone Number *</label>
-      <input type="text" name="phone_number" id="phone_number" required>
+    <div class="phone-group">
+      <select name="phone_extension" id="phone_extension">
+        <option value="+91">+91</option>
+        <option value="+1">+1</option>
+        <option value="+44">+44</option>
+        <!-- add more extensions as needed -->
+      </select>
+      <input type="text" name="phone_number" id="phone_number" required placeholder="Phone Number">
     </div>
   </div>
 
-  <div class="formbold-input-flex">
-    <div>
-      <label>Machine Plan Status</label>
-      <input type="text" name="amc_type" id="amc_type" readonly>
-    </div>
-    <div>
-      <label>Customer</label>
-      <input type="text" name="customer" id="customer" readonly>
-    </div>
+<div class="formbold-input-flex" style="display: none;">
+  <div>
+    <label>Customer</label>
+    <input type="text" name="customer" id="customer" readonly>
   </div>
+  <div style="display: none;">
+    <label>Customer Name</label>
+    <input type="text" name="customer_name" id="customer_name" readonly>
+  </div>
+</div>
 
-  <!-- Hidden additional fields -->
+  <!-- Hidden Additional Fields -->
   <input type="hidden" name="territory" id="territory">
   <input type="hidden" name="serial_no[]" id="table_serial_no">
   <input type="hidden" name="item_code[]" id="item_code">
@@ -293,7 +318,7 @@
     <textarea name="description" id="description" placeholder="Describe the issue..."></textarea>
   </div>
 
-  <!-- TNC acceptance arranged inline: text, link then checkbox -->
+  <!-- TNC Acceptance -->
   <div class="tnc-container">
     <span>I agree to the terms and conditions</span>
     <a href="#" id="openTNC" class="tnc-link">Read here</a>
@@ -310,32 +335,6 @@
 
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 <script>
-  // Modal popup code for flash messages (existing functionality)
-  document.addEventListener("DOMContentLoaded", function() {
-    var modal = document.getElementById("popupModal");
-    var closeBtn = document.getElementsByClassName("close")[0];
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        var message = "{{ messages[0][1]|safe }}";
-        document.getElementById("popupMessage").innerText = message;
-        modal.style.display = "block";
-      {% endif %}
-    {% endwith %}
-
-    // When the user clicks the close button, hide modal and redirect
-    closeBtn.onclick = function() {
-      modal.style.display = "none";
-      window.location.href = "https://www.electrolabgroup.com";
-    }
-    // When the user clicks outside the modal content, hide modal and redirect
-    window.onclick = function(event) {
-      if (event.target == modal) {
-        modal.style.display = "none";
-        window.location.href = "https://www.electrolabgroup.com";
-      }
-    }
-  });
-
   // Set current date for issue_generate_date and issue_received_date fields
   const today = new Date();
   const yyyy = today.getFullYear();
@@ -357,31 +356,48 @@
     }
   }
 
-  // TNC Modal functionality
+  // Modal Popup Code for Flash Messages
+  document.addEventListener("DOMContentLoaded", function() {
+    var modal = document.getElementById("popupModal");
+    var closeBtn = document.getElementsByClassName("close")[0];
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        var message = "{{ messages[0][1]|safe }}";
+        document.getElementById("popupMessage").innerText = message;
+        modal.style.display = "block";
+      {% endif %}
+    {% endwith %}
+    closeBtn.onclick = function() {
+      modal.style.display = "none";
+      window.location.href = "https://www.electrolabgroup.com";
+    }
+    window.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+        window.location.href = "https://www.electrolabgroup.com";
+      }
+    }
+  });
+
+  // TNC Modal Functionality
   document.addEventListener("DOMContentLoaded", function() {
     var tncModal = document.getElementById("tncModal");
     var openTNC = document.getElementById("openTNC");
     var closeTNC = document.getElementById("closeTNC");
     var agreeTNC = document.getElementById("agreeTNC");
-
     openTNC.addEventListener("click", function(e) {
       e.preventDefault();
       tncModal.style.display = "block";
     });
-
     closeTNC.addEventListener("click", function() {
       tncModal.style.display = "none";
     });
-
     agreeTNC.addEventListener("click", function() {
-      // Check the TNC checkbox and enable submit
       var checkbox = document.getElementById("enableSubmit");
       checkbox.checked = true;
       toggleButton();
       tncModal.style.display = "none";
     });
-
-    // Optional: close the TNC modal when clicking outside its content
     window.addEventListener("click", function(event) {
       if (event.target == tncModal) {
         tncModal.style.display = "none";
@@ -389,31 +405,7 @@
     });
   });
 
-  // OTP functionality: Send OTP automatically on email blur and verify/verify again OTP with the button
-  document.getElementById("custom_contact_email").addEventListener("blur", function() {
-    const email = this.value.trim();
-    if (email) {
-      const formData = new FormData();
-      formData.append("custom_contact_email", email);
-      fetch("/send_otp", {
-        method: "POST",
-        body: formData
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.error) {
-          alert(data.error);
-        } else {
-          document.getElementById("otpContainer").style.display = "flex";
-          document.getElementById("otpStatus").innerText = "OTP sent. Please check your email.";
-        }
-      })
-      .catch(err => {
-        console.error("Error sending OTP:", err);
-        alert("Error sending OTP. Please try again later.");
-      });
-    }
-  });
+
 
   document.getElementById("verifyOtpButton").addEventListener("click", function() {
     const button = this;

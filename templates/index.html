@@ -9,9 +9,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
 
-  <!-- hCaptcha API -->
-  <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
-
   <style>
     /* Dialog Overlay */
     .dialog-overlay {
@@ -137,13 +134,9 @@
   <div class="input-wrapper">
     <input type="text" id="serial_no" placeholder="Enter Serial Number" required autocomplete="off" autofocus>
     <!-- Button is now disabled by default -->
-    <button id="enterButton" disabled><i class="fa-solid fa-arrow-right"></i></button>
+    <button id="enterButton"><i class="fa-solid fa-arrow-right"></i></button>
   </div>
 
-  <!-- hCaptcha Widget with data-callback to enable the button when solved -->
-  <div class="captcha-container">
-    <div class="h-captcha" data-sitekey="403a17b2-3a9a-4834-9fec-254080701fb8" data-callback="enableSearchButton"></div>
-  </div>
 
   <!-- Error Dialog Box -->
   <div id="errorDialog" class="dialog-overlay">
@@ -167,10 +160,7 @@
     const errorMessage = document.getElementById("errorMessage");
     const closeDialog = document.getElementById("closeDialog");
 
-    // hCaptcha callback: enable the search button when the captcha is completed.
-    window.enableSearchButton = function(token) {
-      enterButton.disabled = false;
-    };
+
 
     enterButton.addEventListener("click", function () {
       fetchSerialDetails();
@@ -193,12 +183,6 @@
         return;
       }
 
-      // Check if Google reCAPTCHA is completed
-var captchaResponse = grecaptcha.getResponse();
-if (captchaResponse.length === 0) {
-  showErrorDialog("Please complete the captcha.");
-  return;
-}
 
 
       document.getElementById("loading").style.display = "flex"; // Show loading
@@ -221,7 +205,7 @@ if (captchaResponse.length === 0) {
         .catch(error => {
           console.error("Error fetching serial details:", error);
           document.getElementById("loading").style.display = "none";
-          showErrorDialog("We were not able to fetch this serial number in our system.\nFor service booking please mail us on: service@electrolabgroup.com");
+          showErrorDialog("We were not able to fetch this serial number in our system.\nFor service booking please mail us on: \nservice@electrolabgroup.com. \n You can also raise issue on: \n +91 9167839674");
         });
     }
 

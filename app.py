@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session,send_from_directory
 import requests
 import pandas as pd
 import random
@@ -22,6 +22,9 @@ app = Flask(__name__)
 app.secret_key = str(random_number)
 CORS(app)
 
+@app.route('/elec-image')
+def serve_image():
+    return send_from_directory('static', 'ELEC.png')
 
 def load_and_preprocess_data():
     base_url = 'https://erpv14.electrolabgroup.com/'
@@ -211,7 +214,7 @@ def get_serial_details():
 
         data = serial_response.json().get('data', [])
         if not data:
-            print("⚠️ No serial number found in ERP!")
+            print("No serial number found in ERP!")
             return None
 
         ser_per_df = pd.DataFrame(data)
@@ -271,10 +274,11 @@ def get_serial_details():
 
 # Global SMTP_SSL configuration using your provided settings
 SMTP_SERVER = "email.electrolabgroup.com"
-SMTP_PORT = 465
+SMTP_PORT = 587
 SMTP_USERNAME = "econnect"
 SMTP_PASSWORD = "Requ!reMent$"
 SMTP_EMAIL = "econnect@electrolabgroup.com"  # Sender email
+
 
 
 @app.route('/submit', methods=['POST'])
@@ -348,16 +352,31 @@ def submit_form():
                 issue_name = issue_response.get("data", {}).get("name", "Unknown")
 
                 RECIPIENT_EMAILS = [email]
-                message = f'Your File is submitted with ID : {issue_name}'
+                message = f"""
+                <html>
+                  <body>
+                    <p>Dear Sir/Madam,</p>
+                    <br>
+                    <p>Your service request has been submitted.</p>
+                    <p>The following ticket number was issued: <b>{issue_name}</b></p>
+                    <br>
+                    <br>
+                    <p><strong>** NOTE: This is a system-generated response **</strong></p>
+                  </body>
+                </html>
+                """
 
                 msg = MIMEMultipart()
                 msg['From'] = SMTP_EMAIL
                 msg['To'] = ", ".join(RECIPIENT_EMAILS)
                 msg['Subject'] = "Electrolab Issue Form Notification"
-                msg.attach(MIMEText(message, 'plain'))
+                msg.attach(MIMEText(message, 'html'))
 
                 try:
-                    with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+                    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                        server.ehlo()  # Identify to mail server
+                        server.starttls()  # Secure the connection
+                        server.ehlo()
                         server.login(SMTP_USERNAME, SMTP_PASSWORD)
                         server.sendmail(SMTP_EMAIL, RECIPIENT_EMAILS, msg.as_string())
                         print("Email sent successfully.")
@@ -366,7 +385,7 @@ def submit_form():
             except Exception as e:
                 issue_name = "Unknown"
             flash(
-                f'Request submitted successfully! Issue Name: {issue_name}, for any query contact us on: service@electrolabgroup.com or +91 9167839674',
+                f'Request submitted successfully! Ticket No: {issue_name}, for any query contact us on: service@electrolabgroup.com or +91 9167839674',
                 'success')
         else:
             flash(f'Error {response.status_code}, please check the form and submit again.', 'error')
@@ -429,16 +448,32 @@ def submit_form_warranty():
                 warranty_name = warranty_response.get("data", {}).get("name", "Unknown")
 
                 RECIPIENT_EMAILS = [email]
-                message = f'Your File is submitted with ID : {warranty_name}'
+                message = f"""
+                                <html>
+                                  <body>
+                                    <p>Dear Sir/Madam,</p>
+                                    <br>
+                                    <p>Your service request has been submitted.</p>
+                                    <p>The following ticket number was issued: <b>{warranty_name}</b></p>
+                                    <br>
+                                    <br>
+                                    <p><strong>** NOTE: This is a system-generated response **</strong></p>
+                                  </body>
+                                </html>
+                                """
+                #message = f'Your File is submitted with ID : {warranty_name}'
 
                 msg = MIMEMultipart()
                 msg['From'] = SMTP_EMAIL
                 msg['To'] = ", ".join(RECIPIENT_EMAILS)
                 msg['Subject'] = "Electrolab Warranty Form Notification"
-                msg.attach(MIMEText(message, 'plain'))
+                msg.attach(MIMEText(message, 'html'))
 
                 try:
-                    with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+                    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                        server.ehlo()  # Identify to mail server
+                        server.starttls()  # Secure the connection
+                        server.ehlo()
                         server.login(SMTP_USERNAME, SMTP_PASSWORD)
                         server.sendmail(SMTP_EMAIL, RECIPIENT_EMAILS, msg.as_string())
                         print("Email sent successfully.")
@@ -447,7 +482,7 @@ def submit_form_warranty():
             except Exception as e:
                 warranty_name = "Unknown"
             flash(
-                f'Request submitted successfully! Warranty Name: {warranty_name}, for any query contact us on: service@electrolabgroup.com or +91 9167839674',
+                f'Request submitted successfully! Ticket No: {warranty_name}, for any query contact us on: service@electrolabgroup.com or +91 9167839674',
                 'success')
         else:
             flash(f'Error {response.status_code}, please check the form and submit again.', 'error')
@@ -508,3 +543,4 @@ def search_serials():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
+    #Pass
